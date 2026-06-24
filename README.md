@@ -1,6 +1,6 @@
 # AKG-Omics
 
-AKG-Omics is a knowledge-guided framework for spatial omics generation across transcriptomic-proteomic and transcriptomic-metabolomic tasks. The code supports deterministic rule-based knowledge selection and an optional LLM Agent that selects and adapts external biological knowledge sources before model training.
+AKG-Omics is a one-for-all knowledge-guided framework for histology-conditioned spatial omics generation. The code supports deterministic rule-based knowledge selection and an optional LLM Agent that selects and adapts external biological knowledge sources before model training.
 
 ## Repository layout
 
