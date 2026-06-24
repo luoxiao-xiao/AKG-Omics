@@ -125,5 +125,4 @@ bash run_scripts/visualize_predictions_only.sh
 ## Notes
 
 - The default scripts are designed to reproduce the paper experiments on a Linux GPU server.
-- Large datasets, KB files, caches, and trained results are intentionally not included.
 - Do not commit API keys. Use environment variables such as `DEEPSEEK_API_KEY` or `KNOWLEDGE_AGENT_LLM_API_KEY`.
