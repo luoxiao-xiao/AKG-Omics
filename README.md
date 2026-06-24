@@ -122,20 +122,6 @@ OUT_ROOT=/path/to/output \
 bash run_scripts/visualize_predictions_only.sh
 ```
 
-## 7. Analyze external knowledge
-
-Static source audits and dynamic-KB case studies are in `analysis_scripts/`:
-
-```bash
-python analysis_scripts/audit_external_knowledge.py --help
-bash analysis_scripts/run_dynamic_kb_ablation_task3.sh
-python analysis_scripts/screen_4806_kb_case_genes.py --help
-python analysis_scripts/trace_case_gene_kb_relations.py --help
-python analysis_scripts/plot_case_gene_knowledge_chain.py --help
-```
-
-These scripts are useful for inspecting which external sources were retained, how dynamic localization changes a prior, and which genes/proteins benefit from knowledge-guided prediction.
-
 ## Notes
 
 - The default scripts are designed to reproduce the paper experiments on a Linux GPU server.
