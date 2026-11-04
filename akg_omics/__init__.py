@@ -1,8 +1,2 @@
-from . import preprocess as pp
-from .core import AKGOmicsDualBranchProtocol, AKGOmicsFullPartialProtocol
-
-__all__ = [
-    "pp",
-    "AKGOmicsDualBranchProtocol",
-    "AKGOmicsFullPartialProtocol",
-]
+"""AKG-Omics main architecture: H00, source-only preprocessing, Rule/Agent."""
+__version__ = "2026.11.03"
