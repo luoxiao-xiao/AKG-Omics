@@ -114,6 +114,8 @@ def train(data, prior_path, output, policy, seed=1, device="cuda:0", smoke=False
                     initial_parameter_sha256=parameter_hash(trainer.model),
                     data_ready_sha256=sha256(data.folder / "READY.json"),
                     source_transform_sha256=sha256(data.folder / "transforms.npz"),
+                    preprocessing_schema_version=data.metadata["preprocessing_schema_version"],
+                    source_fit_record_sha256=sha256(data.folder / "fit_scope.json"),
                     prior_sha256=sha256(prior_path),
                     knowledge_selection=kb.get("selection"),
                     selection_replayed=kb.get("selection_replayed", False),

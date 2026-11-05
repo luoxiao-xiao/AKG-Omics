@@ -41,6 +41,14 @@ class SpatialExFullPartialProtocol(_BaseTrainer):
 
     def __init__(self, target_task, full_he, full_graph, full_gene, full_protein, partial_he, partial_graph, partial_gene_obs=None, partial_protein_obs=None, partial_gene_eval=None, partial_protein_eval=None, full_gene_latent=None, full_slice_id=0, partial_slice_id=1, he_dim=None, protein_dim=None, gene_dim=None, gene_pca_components=None, gene_pca_mean=None, hidden_dim=256, num_layers=2, epochs=200, lr=0.001, dropout=0.1, weight_decay=0.0, optimizer='adam', seed=0, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'), save_path=None, protein_gene_prior=None, gene_protein_prior=None, gene_gene_kb_graph=None, protein_protein_kb_graph=None, celltype_gene_prior=None, celltype_protein_prior=None, lambda_target=1.0, lambda_pcc=0.0, lambda_latent=0.5, lambda_recon=0.2, lambda_kb=0.15, lambda_graph=0.05, lambda_ortho=0.0, lambda_dgi=0.0, lambda_cycle=0.2, lambda_partial_cycle=0.2, lambda_align=0.05, lambda_bridge_align=0.5, target_soft_alpha=0.0, kb_ct_prior_mix=0.7, lambda_full=1.0, lambda_partial=0.0, align_max_points=512, full_use_obs=True, partial_use_obs=True, use_amp=False, disable_dynamic_retriever=False, disable_kb_fusion=False, disable_soft_gate=True, disable_residual_refine=False):
         super().__init__(device)
+        if partial_gene_eval is not None or partial_protein_eval is not None:
+            raise ValueError('Hidden target responses belong to the evaluator, never the training protocol')
+        if (target_task == 'gene' and partial_gene_obs is not None) or (target_task == 'protein' and partial_protein_obs is not None):
+            raise ValueError('The predicted target modality cannot be passed as an observed input')
+        if not partial_use_obs and (partial_gene_obs is not None or partial_protein_obs is not None):
+            raise ValueError('This task permits H&E only on the target section')
+        if gene_pca_components is None or gene_pca_mean is None or full_gene_latent is None:
+            raise ValueError('Explicit source-fitted PCA basis, mean and source latent data are required')
         assert target_task in ['gene', 'protein']
         self.target_task = target_task
         self.epochs = epochs

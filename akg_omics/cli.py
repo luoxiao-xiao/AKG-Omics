@@ -16,6 +16,10 @@ def parser():
     q.add_argument("--task", required=True, type=int)
     q.add_argument("--input-config", required=True)
     q.add_argument("--output", required=True)
+    q = sub.add_parser("audit-data", help="Validate a v2 source-fitted pack without opening evaluation truth")
+    q.add_argument("--dataset", required=True, choices=DATASETS)
+    q.add_argument("--task", required=True, type=int)
+    q.add_argument("--data", required=True)
     q = sub.add_parser("prepare-coad", help="Strict assay QC and physical 32um aggregation")
     for name in ("rna", "protein", "gene-he-cache", "protein-he-cache", "output"):
         q.add_argument("--" + name, required=True)
@@ -53,6 +57,12 @@ def main(argv=None):
         print(result)
         return
     spec = task_spec(a.dataset, a.task)
+    if a.command == "audit-data":
+        from .validation import validate_prepared
+        meta = validate_prepared(a.data, spec)
+        print(json.dumps(dict(passed=True, schema_version=meta["preprocessing_schema_version"],
+                              task=spec, evaluation_truth_opened=False), indent=2))
+        return
     if a.command == "prepare":
         from .preprocessing import prepare
         print(prepare(a.input_config, a.dataset, a.task, a.output))

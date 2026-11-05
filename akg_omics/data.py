@@ -3,21 +3,19 @@ import pickle
 import numpy as np
 import scipy.sparse as sp
 from .io import read_json, verify_hash
+from .validation import validate_prepared
 
 
 class TaskData:
     def __init__(self, folder, spec, expected_ready=None):
         self.folder, self.spec = Path(folder), spec
         verify_hash(self.folder / "READY.json", expected_ready)
-        self.metadata = read_json(self.folder / "READY.json")
+        self.metadata = validate_prepared(self.folder, spec)
         if not self.metadata.get("acceptance", {}).get("source_only_fit"):
             raise ValueError("A source-only preprocessing record is required")
         if self.metadata.get("task") != spec["task"]:
             raise ValueError("Task number does not match the prepared pack")
         verify_hash(self.folder / "transforms.npz", self.metadata.get("source_transform_sha256"))
-        for name, expected in self.metadata.get("files", {}).items():
-            if name != "target_truth.npy" and (self.folder / name).is_file():
-                verify_hash(self.folder / name, expected)
         self.full = {k: np.load(self.folder / (k + ".npy"), mmap_mode="r", allow_pickle=False)
                      for k in ("gene", "other", "he", "latent")}
         self.test = {"he": np.load(self.folder / "partial_he.npy", allow_pickle=False)}
