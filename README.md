@@ -1,128 +1,98 @@
 # AKG-Omics
 
-AKG-Omics is a one-for-all knowledge-guided framework for histology-conditioned spatial omics generation. The code supports deterministic rule-based knowledge selection and an optional LLM Agent that selects and adapts external biological knowledge sources before model training.
+AKG-Omics integrates histology, molecular measurements, and biological knowledge for spatial cross-omics prediction.
 
-## Repository layout
-
-```text
-akg_omics/                    Core model, training protocols, data preparation, and KB agent
-akg_omics/knowledge_agent/    Rule/Agent source selection and LLM client code
-run_scripts/                  Reproducible training and visualization entrypoints
-analysis_scripts/             External-knowledge ablation and case-study analysis scripts
-visualization_scripts/        Figure-oriented spatial prediction visualization scripts
-requirements.txt              Python dependency list used in our experiments
-pyproject.toml                Editable-install package metadata
-```
-
-## 1. Create the environment
-
-We used Python 3.10/3.11 with CUDA-enabled PyTorch. A typical setup is:
+## Installation
 
 ```bash
-conda create -n akg-omics python=3.10 -y
+conda create -n akg-omics python=3.11 -y
 conda activate akg-omics
 pip install -r requirements.txt
-pip install -e .
 ```
 
-If your CUDA/PyTorch versions differ, install the PyTorch build that matches your GPU first, then install the remaining packages.
+A CUDA-enabled PyTorch installation is required for GPU training.
 
-## 2. Prepare data and knowledge bases
+## Data preparation
 
-The run scripts expect these paths by default:
+Place the section-level arrays in `data/<dataset>/<section>/`:
+
+```text
+data/
+├── lymphnode/{A1,D1}/
+├── tonsil/{A1,D1}/
+├── mouse/{B1,C1}/
+└── coad/{gene,protein}/
+```
+
+Each section directory contains the following NumPy arrays. Rows must follow the same spot order.
+
+| File | Shape | Contents |
+|---|---|---|
+| `gene.npy` | spots × genes | Per-spot normalized RNA expression |
+| `other.npy` | spots × features | Per-spot normalized protein or metabolite measurements |
+| `he.npy` | spots × embedding dimensions | H&E features from a frozen image encoder |
+| `coords.npy` | spots × 2 | Spatial coordinates |
+| `ids.npy` | spots | Unique spot identifiers |
+| `gene_names.npy` | genes | Unique gene symbols |
+| `other_names.npy` | features | Unique protein names or metabolite feature identifiers |
+
+For mouse data, also provide `gene_ids.npy` containing Ensembl gene IDs in the same order as `gene_names.npy`. An optional `other_symbols.npy` maps protein panel labels to gene symbols. Save identifiers as NumPy string arrays.
+
+Use arrays before feature selection, fitted scaling, or PCA. The preparation step selects features and fits scaling/PCA on the source section, then applies the frozen transforms to permitted target inputs. Input locations are configured in `configs/<dataset>_inputs.json`.
+
+Place knowledge resources in `assets/human/` or `assets/metabolite/`; filenames are listed in [assets/README.md](assets/README.md).
+
+## Run
+
+Prepare one task:
 
 ```bash
-export PROTEO_DATA_ROOT=data/spatch
-export PROTEO_KB_DIR=data/KB
-export KB_ROOT=data/KB/metabolite
+python run.py prepare --dataset tonsil --task 4 --output prepared/tonsil_T04
 ```
 
-For another machine, point these variables to your local data and KB directories before running. The proteogenomics data should contain the paired H&E, protein, and gene inputs used by `akg_omics.run`. The metabolomics KB root should contain the Reactome, ChEBI, and HMDB resources used by `akg_omics.run_metabolomics_final`.
-
-## 3. Configure the optional Agent
-
-Rule mode does not call any external API. Agent mode uses an OpenAI-compatible chat-completions interface. In our final experiments, the Agent was configured with DeepSeek V4 Pro:
+Train and evaluate using the prepared data:
 
 ```bash
-export KNOWLEDGE_AGENT_LLM_PROVIDER=deepseek
-export KNOWLEDGE_AGENT_LLM_MODEL=deepseek-v4-pro
-export KNOWLEDGE_AGENT_LLM_ENDPOINT=https://api.deepseek.com/v1/chat/completions
-export DEEPSEEK_API_KEY=<your_deepseek_key>
+python run.py run --dataset tonsil --task 4 --policy rule \
+  --data prepared/tonsil_T04 --output outputs/tonsil_T04_rule
 ```
 
-You can also use another provider by setting:
+Alternatively, prepare data and run the model in one command:
 
 ```bash
-export KNOWLEDGE_AGENT_LLM_PROVIDER=openai   # or openai_compatible, gemini, anthropic, qwen, glm
-export KNOWLEDGE_AGENT_LLM_MODEL=<model_name>
-export KNOWLEDGE_AGENT_LLM_ENDPOINT=<chat_completions_endpoint>
-export KNOWLEDGE_AGENT_LLM_API_KEY=<your_api_key>
+python run.py run --dataset tonsil --task 4 --policy rule \
+  --output outputs/tonsil_T04_rule
 ```
 
-If no API key is provided, deterministic rule-based knowledge selection still works. The training scripts run both rule and agent variants where appropriate; the agent variant falls back safely when the LLM is disabled or unavailable.
+Replace `--dataset` with `coad`, `lymphnode`, `tonsil`, or `mouse`, and choose the corresponding task:
 
-## 4. Run proteogenomics tasks
+| Task | Input | Prediction | Datasets |
+|---|---|---|---|
+| T1 | H&E | RNA | coad, lymphnode, tonsil |
+| T2 | H&E | Protein | coad, lymphnode, tonsil |
+| T3 | H&E + protein | RNA | coad, lymphnode, tonsil |
+| T4 | H&E + RNA | Protein | coad, lymphnode, tonsil |
+| T5 | H&E | Metabolite features | mouse |
+| T6 | H&E | RNA | mouse |
+| T7 | H&E + RNA | Metabolite features | mouse |
+| T8 | H&E + metabolite features | RNA | mouse |
 
-Run the final 700-epoch, patience-30 setting for the four transcriptomic-proteomic tasks:
+Use `--policy agent` for the provided Agent configuration. Both policies use the source-selection settings in `configs/knowledge.json` by default. For fresh Agent selection, add `--knowledge select` and set `KNOWLEDGE_AGENT_LLM_PROVIDER`, `KNOWLEDGE_AGENT_LLM_MODEL`, and `KNOWLEDGE_AGENT_LLM_API_KEY` in the environment.
 
-```bash
-bash run_scripts/train_proteogenomics_rule_agent.sh
+Use `--seed 1` to set the training seed and `--device cuda:0` to select a GPU (`--device cpu` for CPU execution). Results are written to `<output>/run/metrics.json` and `<output>/run/feature_metrics.npz`.
+
+## Code structure
+
+```text
+akg_omics/
+├── core/                 # Model architecture and training protocol
+├── preprocessing.py      # Source-fitted feature selection, scaling, and PCA
+├── data.py               # Task data loading
+├── validation.py         # Input and fitted-transform validation
+├── knowledge.py          # Knowledge construction
+├── knowledge_agent/      # Knowledge-source selection
+├── human_builder.py      # Gene/protein knowledge relations
+├── metabolic_builder.py  # Gene/metabolite knowledge relations
+├── trainer.py            # Training and evaluation
+└── cli.py                # Command-line interface
 ```
-
-Common overrides:
-
-```bash
-CUDA_VISIBLE_DEVICES=0 DEVICE=cuda:0 bash run_scripts/train_proteogenomics_rule_agent.sh
-FINAL_SEEDS=1 bash run_scripts/train_proteogenomics_rule_agent.sh
-PROTEO_DATA_ROOT=/path/to/spatch bash run_scripts/train_proteogenomics_rule_agent.sh
-```
-
-Additional ablation/configuration entrypoints:
-
-```bash
-bash run_scripts/train_proteogenomics_target_cycle_kb_align.sh
-bash run_scripts/train_proteogenomics_dynamic_gate.sh
-bash run_scripts/run_gene_panel_sweep.sh
-```
-
-## 5. Run metabolomics tasks
-
-Run the final Task5-Task8 metabolomics configuration:
-
-```bash
-bash run_scripts/train_metabolomics_task5_8.sh
-```
-
-Baseline visualization is optional. To enable it, provide a compatible baseline repository:
-
-```bash
-RUN_BASELINE_VISUALIZATION=1 BASELINE_ROOT=/path/to/baseline_repo bash run_scripts/train_metabolomics_task5_8.sh
-```
-
-## 6. Visualize predictions
-
-After training, generate spatial prediction figures:
-
-```bash
-bash run_scripts/visualize_predictions_only.sh
-```
-
-For direct re-export of Task1/Task2 arrays followed by figure generation:
-
-```bash
-bash run_scripts/visualize_all_tasks.sh
-```
-
-Key path overrides:
-
-```bash
-PROTEO_RUN_ROOT=/path/to/proteogenomics/run \
-MET_ANALYSIS_ROOT=/path/to/metabolomics/detailed_analysis \
-OUT_ROOT=/path/to/output \
-bash run_scripts/visualize_predictions_only.sh
-```
-
-## Notes
-
-- The default scripts are designed to reproduce the paper experiments on a Linux GPU server.
-- Do not commit API keys. Use environment variables such as `DEEPSEEK_API_KEY` or `KNOWLEDGE_AGENT_LLM_API_KEY`.
